@@ -11,6 +11,7 @@ import asyncio
 import hashlib
 import math
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from typing import TypedDict
@@ -106,12 +107,16 @@ LAYA_QUESTIONS = {
 def _get_router():
     """Load Laya router once and cache. Thread-safe via lru_cache."""
     try:
-        # Keep the local model polite on low-core laptops. Laya is processed by
-        # a single background worker, and PyTorch must not fan out CPU threads.
+        from app.core.config import settings
+
+        # Inference is serialized through one worker. A few CPU threads speed
+        # up the local forward pass without spawning a large thread pool.
         try:
             import torch
 
-            torch.set_num_threads(1)
+            torch.set_num_threads(
+                max(1, min(int(settings.local_llm_threads), os.cpu_count() or 1))
+            )
             try:
                 torch.set_num_interop_threads(1)
             except RuntimeError:
@@ -120,13 +125,12 @@ def _get_router():
             pass
         from laya import Router  # type: ignore[import-untyped]
         logger.info("Loading Laya AI router...")
-        # Keep one multilingual checkpoint resident. The default router may
-        # evict/rebuild English and multilingual checkpoints on every language
-        # switch; a single multilingual model avoids multi-second reloads while
-        # keeping memory bounded on modest PCs.
+        # Keep both common checkpoints resident. English and Russian signals
+        # otherwise alternate between English and multilingual models; with
+        # max_loaded=1 every language switch can rebuild a checkpoint from disk.
         router = Router(
             preload=False,
-            max_loaded=1,
+            max_loaded=2,
             device="cpu",
             default="multilingual",
         )
@@ -228,13 +232,18 @@ def _classify_sync(
             if actionability_choice == "fluff" or is_thin:
                 noise_probability = max(noise_probability, 0.9)
 
-            trending_score = _finite_float(trending_ans.get("score"), 1.0, 0.0, 2.0) / 2.0
-            alpha_score = _finite_float(alpha_ans.get("score"), 0.0, 0.0, 100.0)
-            monetization_potential = _finite_float(monet_ans.get("score"), 0.0, 0.0, 100.0)
-            actionability_potential = _finite_float(actionability_pot_ans.get("score"), strength, 0.0, 100.0)
-            risk_reward_ratio = _finite_float(risk_reward_ans.get("score"), 3.5, 0.0, 100.0)
-            if risk_reward_ratio > 10.0:
-                risk_reward_ratio = max(1.0, risk_reward_ratio / 10.0)
+            trending_score = _score_fraction(trending_ans.get("score"), 0.5)
+            alpha_score = _score_percent(alpha_ans.get("score"), 0.0)
+            monetization_potential = _score_percent(monet_ans.get("score"), 0.0)
+            actionability_potential = _score_percent(
+                actionability_pot_ans.get("score"), strength
+            )
+            # Laya `score` answers use a 0..2 scale; the app exposes this field
+            # on a 1..10 scale, so convert explicitly instead of treating 1.4
+            # as a near-zero score.
+            risk_reward_ratio = max(
+                1.0, min(_finite_float(risk_reward_ans.get("score"), 0.7, 0.0, 2.0) * 5.0, 10.0)
+            )
 
             # This is a heuristic indicator, not a calibrated real-world
             # probability. Keep the field conservative until outcome labels exist.
@@ -342,6 +351,16 @@ def _finite_float(value: object, default: float, minimum: float, maximum: float)
     if not math.isfinite(parsed):
         return default
     return min(max(parsed, minimum), maximum)
+
+
+def _score_fraction(value: object, default: float) -> float:
+    """Convert Laya's documented 0..2 score into a normalized 0..1 value."""
+    return _finite_float(value, default * 2.0, 0.0, 2.0) / 2.0
+
+
+def _score_percent(value: object, default: float) -> float:
+    """Convert Laya's 0..2 score scale to the app's 0..100 display scale."""
+    return _score_fraction(value, default / 100.0) * 100.0
 
 
 def _normalize_priority(

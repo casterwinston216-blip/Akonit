@@ -41,3 +41,8 @@ def test_critical_label_requires_engine_evidence():
         status="BREAKOUT",
         minimum_strength=45.0,
     ) == ("critical", 0.8, 0.7)
+
+
+def test_laya_score_scale_is_converted_to_application_scales():
+    assert laya_classifier._score_fraction(1.5, 0.5) == 0.75
+    assert laya_classifier._score_percent(1.5, 0.0) == 75.0

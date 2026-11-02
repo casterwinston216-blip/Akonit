@@ -10,7 +10,6 @@ import type {
   Country,
   CustomTag,
   CustomTagDraft,
-  Profile,
   SourceInfo,
 } from "@/lib/types";
 import { useAuth } from "@/store/auth";
@@ -20,7 +19,6 @@ export default function ProfilePage() {
   const [tags, setTags] = useState<CustomTag[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [sources, setSources] = useState<SourceInfo[]>([]);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [sourceWeights, setSourceWeights] = useState<Record<string, number>>({});
   const [collectorKeywords, setCollectorKeywords] = useState<string[]>([]);
   const [keywordDraft, setKeywordDraft] = useState("");
@@ -51,8 +49,7 @@ export default function ProfilePage() {
         ]);
         setCountries(c);
         setSources(s);
-        setProfile(p);
-        setSourceWeights(Object.fromEntries(s.map((item) => [item.id, p.collector_source_weights?.[item.id] ?? 5])));
+        setSourceWeights(Object.fromEntries(s.map((item) => [item.id, p.collector_source_weights?.[item.id] ?? 8])));
         setCollectorKeywords(p.collector_keywords ?? []);
         setCollectorReady(true);
         void api.workerStatus().then(setWorker).catch(() => setWorker(null));
@@ -83,11 +80,10 @@ export default function ProfilePage() {
       setCollectorSave("saving");
       setCollectorError(null);
       try {
-        const updated = await api.updateProfile({
+        await api.updateProfile({
           collector_source_weights: sourceWeights,
           collector_keywords: collectorKeywords,
         });
-        setProfile(updated);
         setCollectorSave("saved");
       } catch (err) {
         setCollectorSave("error");
@@ -269,7 +265,7 @@ export default function ProfilePage() {
         </div>
         <div className="collector-source-list">
           {sources.filter((source) => source.name.toLowerCase().includes(sourceSearch.toLowerCase()) || source.id.toLowerCase().includes(sourceSearch.toLowerCase())).map((source) => {
-            const weight = sourceWeights[source.id] ?? 5;
+            const weight = sourceWeights[source.id] ?? 8;
             return <div className="collector-source-row" key={source.id} data-disabled={weight === 0}>
               <div className="collector-source-name"><strong>{source.name}</strong><span className="muted">{source.status === "OFFLINE" ? "Needs access" : source.type.toLowerCase()}</span></div>
               <input aria-label={`${source.name} collection priority`} type="range" min={0} max={10} step={1} value={weight} onChange={(event) => setSourceWeights({ ...sourceWeights, [source.id]: Number(event.target.value) })} />

@@ -221,6 +221,15 @@ async def list_signals(
                         # a measured trend or an independently corroborated
                         # event just because both are fresh.
                         _evidence_tier(),
+                        # Let Laya's independently computed content-quality
+                        # triage demote noise within the same evidence tier.
+                        # Unclassified signals stay alongside normal watch items.
+                        case(
+                            (Signal.ai_priority == "critical", 0),
+                            (Signal.ai_priority == "watch", 1),
+                            (Signal.ai_priority.is_(None), 1),
+                            else_=2,
+                        ),
                         # A formerly strong signal that is now FADING must not
                         # sit above fresh live discoveries just because its
                         # historical score has not decayed yet.

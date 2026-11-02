@@ -235,7 +235,7 @@ function ConditionRow({
   onRemove,
 }: RowProps) {
   const selected = listValue(condition);
-  const numeric = NUMERIC_KINDS.includes(condition.type as any);
+  const numeric = NUMERIC_KINDS.includes(condition.type as ConditionKind);
 
   function toggle(value: string) {
     const next = selected.includes(value)

@@ -34,6 +34,7 @@ OllamaSetup.exe
 # Node
 node_modules/
 .next/
+.next-build/
 out/
 npm-debug.log*
 *.tsbuildinfo

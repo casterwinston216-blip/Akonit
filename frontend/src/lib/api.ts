@@ -4,7 +4,6 @@ import type {
   Country,
   CustomTag,
   CustomTagDraft,
-  NotificationFrequency,
   NotificationStatus,
   Profile,
   PublicStats,
@@ -84,7 +83,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (response.status === 204) return undefined as T;
 
   const text = await response.text();
-  let data: any = null;
+  let data: unknown = null;
   if (text) {
     try {
       data = JSON.parse(text);
@@ -94,11 +93,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    const detail =
-      typeof data?.detail === "string"
+    const detailValue =
+      data && typeof data === "object" && !Array.isArray(data) && "detail" in data
         ? data.detail
-        : Array.isArray(data?.detail)
-          ? data.detail.map((d: { msg: string }) => d.msg).join("; ")
+        : undefined;
+    const detail =
+      typeof detailValue === "string"
+        ? detailValue
+        : Array.isArray(detailValue)
+          ? detailValue
+              .map((item: unknown) => {
+                if (item && typeof item === "object" && "msg" in item) {
+                  return String(item.msg);
+                }
+                return String(item);
+              })
+              .join("; ")
           : `Request failed (${response.status})`;
     throw new ApiError(response.status, detail);
   }

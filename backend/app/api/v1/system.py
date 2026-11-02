@@ -400,9 +400,11 @@ async def get_worker_status(session: SessionDep):
         for source in source_rows:
             adapter = adapters.get(source.id)
             try:
-                weight = int(weights.get(source.id, 5))
+                weight = int(
+                    weights.get(source.id, settings.collector_default_source_weight)
+                )
             except (TypeError, ValueError):
-                weight = 5
+                weight = settings.collector_default_source_weight
             if adapter is None or weight <= 0:
                 continue
             normal_delay = max(

@@ -159,9 +159,9 @@ export interface CustomTagDraft {
 
 export interface RadarCondition {
   id?: string;
-  type: string;
+  type: ConditionType;
   operator: string;
-  value: any;
+  value: string | number | string[];
   unit?: string | null;
 }
 

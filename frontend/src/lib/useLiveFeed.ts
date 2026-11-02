@@ -19,6 +19,7 @@ export function useLiveFeed(
   queryRef.current = query;
   const handlerRef = useRef(onNewSignals);
   handlerRef.current = onNewSignals;
+  const queryKey = JSON.stringify(query);
 
   useEffect(() => {
     let active = true;
@@ -85,7 +86,7 @@ export function useLiveFeed(
       if (timerId) clearTimeout(timerId);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [JSON.stringify(query)]);
+  }, [queryKey]);
 
   return state;
 }

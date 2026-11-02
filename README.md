@@ -60,7 +60,7 @@ To stop it: **`stop.bat`**, or close the windows `start.bat` opened.
 
 ### What you should see
 
-The worker checks for due sources every 60 seconds and runs one initial collection
+The worker checks for due sources every 15 seconds and runs one initial collection
 on startup. Each source has its own collection interval and may be unavailable
 or rate limited, so the first signal can take longer than a minute. Source health
 in the dashboard shows which collectors are currently returning data.

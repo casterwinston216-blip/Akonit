@@ -256,7 +256,7 @@ async def main() -> None:
         scheduler.add_job(
             _cycle_laya,
             "interval",
-            seconds=max(settings.ai_classification_interval_seconds, 15),
+            seconds=max(settings.ai_classification_interval_seconds, 5),
             id="laya",
             max_instances=1,
             coalesce=True,

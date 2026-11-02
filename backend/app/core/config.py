@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # --- app ---
     app_env: str = "development"
-    api_debug: bool = True
+    api_debug: bool = False
     frontend_url: str = "http://localhost:3000"
     cors_origins: str = "http://localhost:3000,http://localhost:8000"
 
@@ -70,24 +70,24 @@ class Settings(BaseSettings):
     # A minute is the point of the product: the whole promise is catching things
     # while they are still early, so the worker runs as often as it reasonably
     # can on the machine it is running on.
-    collect_interval_seconds: int = 60
-    snapshot_interval_seconds: int = 300
-    fetch_timeout_seconds: int = 30
+    collect_interval_seconds: int = 15
+    snapshot_interval_seconds: int = 60
+    fetch_timeout_seconds: int = 15
     # Total budget for one provider including its fallback strategies. A slow
     # public endpoint must not stall every other source for several minutes.
-    source_fetch_timeout_seconds: int = 20
+    source_fetch_timeout_seconds: int = 12
     source_cooldown_seconds: int = 300
     http_user_agent: str = (
         "SignalRadarBot/0.1 (+https://github.com/void-syntax/Akonit) "
         "Mozilla/5.0 (compatible; SignalRadar/0.1)"
     )
-    # Keep the request pool small so a laptop can collect without bursts of
-    # sockets, memory and CPU. Individual collectors still run concurrently.
-    http_max_concurrency: int = 6
+    # Bound network concurrency while letting independent sources overlap.
+    http_max_concurrency: int = 12
+    collector_default_source_weight: int = 8
     collection_max_events_per_source: int = 25
-    ai_classification_enabled: bool = True
-    ai_classification_interval_seconds: int = 15
-    local_llm_threads: int = 1
+    ai_classification_enabled: bool = False
+    ai_classification_interval_seconds: int = 30
+    local_llm_threads: int = 4
     # Unmeasured first mentions are intentionally capped below 15. Let Laya
     # triage promising discoveries without increasing its one-per-minute budget.
     ai_classification_min_strength: float = 8.0

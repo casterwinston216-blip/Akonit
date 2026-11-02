@@ -218,7 +218,9 @@ async def run_collection_cycle(
             adapter
             for adapter in all_adapters()
             if (not source_ids or adapter.source_id in source_ids)
-            and weights.get(adapter.source_id, 5) > 0
+            and weights.get(
+                adapter.source_id, settings.collector_default_source_weight
+            ) > 0
         ]
         # Honor each adapter's cadence. Keep a per-process schedule so frequent
         # worker ticks do not hammer slow-changing public sources.
@@ -235,7 +237,9 @@ async def run_collection_cycle(
                     base_delay.get(
                         adapter.source_id, adapter.collect_interval_seconds
                     ),
-                    weights.get(adapter.source_id, 5),
+                    weights.get(
+                        adapter.source_id, settings.collector_default_source_weight
+                    ),
                 )
             ]
         run_collection_cycle._last_run = last_run

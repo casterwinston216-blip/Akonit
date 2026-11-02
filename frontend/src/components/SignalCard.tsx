@@ -61,7 +61,6 @@ export function SignalCard({ signal, onChange, onDelete }: Props) {
   const meta = STATUS_META[signal.status] ?? STATUS_META.NEW;
   const StatusIcon = STATUS_ICON[meta.icon as StatusIconName];
   const tone = strengthTone(signal.strength);
-  const growthTone = signal.growth > 0 ? "up" : "down";
   const hasGrowth = signal.growth > 0;
   const hasMeasuredActivity =
     signal.current_activity > 0 || signal.previous_activity > 0 || hasGrowth;
