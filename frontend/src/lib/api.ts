@@ -4,7 +4,6 @@ import type {
   Country,
   CustomTag,
   CustomTagDraft,
-  NotificationFrequency,
   NotificationStatus,
   Profile,
   PublicStats,
@@ -84,7 +83,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (response.status === 204) return undefined as T;
 
   const text = await response.text();
-  let data: any = null;
+  let data: unknown = null;
   if (text) {
     try {
       data = JSON.parse(text);
@@ -94,11 +93,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    const detail =
-      typeof data?.detail === "string"
+    const detailValue =
+      data && typeof data === "object" && !Array.isArray(data) && "detail" in data
         ? data.detail
-        : Array.isArray(data?.detail)
-          ? data.detail.map((d: { msg: string }) => d.msg).join("; ")
+        : undefined;
+    const detail =
+      typeof detailValue === "string"
+        ? detailValue
+        : Array.isArray(detailValue)
+          ? detailValue
+              .map((item: unknown) => {
+                if (item && typeof item === "object" && "msg" in item) {
+                  return String(item.msg);
+                }
+                return String(item);
+              })
+              .join("; ")
           : `Request failed (${response.status})`;
     throw new ApiError(response.status, detail);
   }
@@ -190,6 +200,28 @@ export const api = {
 
   notificationStatus: () => request<NotificationStatus>("/notifications/telegram/status"),
 
+  configureTelegramBot: (token: string) =>
+    request<{ ok: boolean; bot_username?: string }>("/notifications/telegram/bot", {
+      method: "PUT",
+      body: JSON.stringify({ token }),
+    }),
+
+  removeTelegramBot: () =>
+    request<{ ok: boolean }>("/notifications/telegram/bot", { method: "DELETE" }),
+
+  testTelegram: () =>
+    request<{ ok: boolean }>("/notifications/telegram/test", { method: "POST" }),
+
+  findTelegramChat: () =>
+    request<{ chat_id: string; name?: string | null }>("/notifications/telegram/find-chat", {
+      method: "POST",
+    }),
+
+  toggleTelegram: (enabled: boolean) =>
+    request<{ ok: boolean; telegram_alerts_enabled: boolean }>(
+      `/notifications/telegram/toggle?enabled=${enabled}`, { method: "POST" },
+    ),
+
   linkTelegram: (chatId: string) =>
     request<{ ok: boolean }>(`/notifications/telegram/link${qs({ chat_id: chatId })}`, {
       method: "POST",
@@ -229,6 +261,14 @@ export const api = {
 
   deleteSignal: (id: string) =>
     request<void>(`/signals/${id}`, { method: "DELETE" }),
+
+  clearAllSignals: () =>
+    request<{
+      deleted_signals: number;
+      deleted_source_events: number;
+      deleted_snapshots: number;
+      collection_queued: boolean;
+    }>("/signals/all", { method: "DELETE" }),
 
   saved: () => request<Signal[]>("/saved"),
 
@@ -303,8 +343,29 @@ export const api = {
       method: "POST",
     }),
 
+  startWorker: () =>
+    request<{ status: string }>("/system/start", {
+      method: "POST",
+    }),
+
   workerStatus: () =>
-    request<{ running: boolean; paused: boolean }>("/system/worker-status"),
+    request<{
+      running: boolean;
+      paused: boolean;
+      heartbeat_at?: string | null;
+      heartbeat_age_seconds?: number | null;
+      collection_state?: string;
+      next_source_check_at?: string | null;
+      last_collection_completed_at?: string | null;
+      last_collection_result?: {
+        fetched?: number;
+        signals_created?: number;
+        sources_due?: number;
+        sources_ok?: number;
+        sources_failed?: number;
+      } | null;
+      last_collection_error?: string | null;
+    }>("/system/worker-status"),
 
   adminStats: () =>
     request<{

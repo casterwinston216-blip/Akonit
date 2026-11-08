@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
   let payload = {};
   try {
     payload = event.data ? event.data.json() : {};
-  } catch (err) {
+  } catch {
     payload = { title: "Signal Radar", body: event.data ? event.data.text() : "" };
   }
 

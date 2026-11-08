@@ -63,7 +63,7 @@ Write-Host ""
 Write-Host "  Database:" -ForegroundColor White
 if (Test-Port 8000) {
     try {
-        $signals = Invoke-RestMethod -Uri "http://localhost:8000/api/signals?limit=1" -TimeoutSec 5 -ErrorAction Stop
+        $signals = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/signals?limit=1" -TimeoutSec 5 -ErrorAction Stop
         if ($signals.total) {
             Write-Host "    Total signals: $($signals.total)" -ForegroundColor Cyan
         } elseif ($signals.Count -ge 0) {
@@ -79,7 +79,7 @@ if (Test-Port 8000) {
 # --- Last collection from worker log ---
 Write-Host ""
 Write-Host "  Recent activity:" -ForegroundColor White
-$workerLog = "$LogDir\worker.log"
+$workerLog = "$LogDir\worker.stdout.log"
 if (Test-Path $workerLog) {
     $lastLines = Get-Content $workerLog -Tail 5 -ErrorAction SilentlyContinue
     if ($lastLines) {

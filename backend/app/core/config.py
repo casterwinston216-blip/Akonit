@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,7 +20,7 @@ class Settings(BaseSettings):
 
     # --- app ---
     app_env: str = "development"
-    api_debug: bool = True
+    api_debug: bool = False
     frontend_url: str = "http://localhost:3000"
     cors_origins: str = "http://localhost:3000,http://localhost:8000"
 
@@ -30,13 +31,22 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://signal:signal@localhost:5432/signal_radar"
     redis_url: str | None = None
     db_echo: bool = False
+    otel_console_exporter_enabled: bool = False
 
     # --- auth ---
-    # There is no login: the app runs on the operator's own machine, so the API
-    # resolves one local account and every request uses it. `auth_disabled=false`
-    # turns token auth back on for anyone who puts this behind a shared host.
+    # This build is a single-user local application. Hosted authentication and
+    # account provisioning are not implemented, so fail fast if someone tries
+    # to turn on the old, nonfunctional JWT switch.
     auth_disabled: bool = True
     local_user_email: str = "local@signalradar"
+
+    @model_validator(mode="after")
+    def require_local_single_user_mode(self) -> "Settings":
+        if self.auth_disabled is not True:
+            raise ValueError(
+                "Shared-host authentication is not implemented; keep AUTH_DISABLED=true"
+            )
+        return self
 
     # --- sources / collectors ---
     github_token: str | None = None
@@ -44,8 +54,15 @@ class Settings(BaseSettings):
     reddit_client_id: str | None = None
     reddit_client_secret: str | None = None
     reddit_user_agent: str = "SignalRadar/0.1"
+    x_api_bearer_token: str | None = None
+    x_posts_daily_read_limit: int = 100
     youtube_api_key: str | None = None
     tiktok_api_token: str | None = None
+    tiktok_commercial_client_key: str | None = None
+    tiktok_commercial_client_secret: str | None = None
+    extra_rss_feeds: str = ""
+    extra_rss_feed_limit: int = 10
+    mastodon_instances: str = "mastodon.social,fosstodon.org,infosec.exchange,hachyderm.io"
     instagram_access_token: str | None = None
     meta_app_id: str | None = None
     meta_app_secret: str | None = None
@@ -53,19 +70,27 @@ class Settings(BaseSettings):
     # A minute is the point of the product: the whole promise is catching things
     # while they are still early, so the worker runs as often as it reasonably
     # can on the machine it is running on.
-    collect_interval_seconds: int = 60
-    snapshot_interval_seconds: int = 300
-    fetch_timeout_seconds: int = 30
+    collect_interval_seconds: int = 15
+    snapshot_interval_seconds: int = 60
+    fetch_timeout_seconds: int = 15
+    # Total budget for one provider including its fallback strategies. A slow
+    # public endpoint must not stall every other source for several minutes.
+    source_fetch_timeout_seconds: int = 12
     source_cooldown_seconds: int = 300
     http_user_agent: str = (
-        "SignalRadarBot/0.1 (+https://github.com/signal-radar) "
+        "SignalRadarBot/0.1 (+https://github.com/void-syntax/Akonit) "
         "Mozilla/5.0 (compatible; SignalRadar/0.1)"
     )
-    # Keep the request pool small so a laptop can collect without bursts of
-    # sockets, memory and CPU. Individual collectors still run concurrently.
-    http_max_concurrency: int = 4
+    # Bound network concurrency while letting independent sources overlap.
+    http_max_concurrency: int = 12
+    collector_default_source_weight: int = 8
     collection_max_events_per_source: int = 25
     ai_classification_enabled: bool = False
+    ai_classification_interval_seconds: int = 30
+    local_llm_threads: int = 4
+    # Unmeasured first mentions are intentionally capped below 15. Let Laya
+    # triage promising discoveries without increasing its one-per-minute budget.
+    ai_classification_min_strength: float = 8.0
 
     # --- tag-driven collection ---
     # Countries to cover before the user configures any radar, so a fresh
@@ -89,7 +114,7 @@ class Settings(BaseSettings):
     # Hard freshness cutoff, applied at ingestion. Search-driven collectors keep
     # surfacing evergreen hits that look new; this is what stops a five-year-old
     # video from entering the feed as a breaking trend. 0 disables the filter.
-    detect_max_age_hours: int = 72
+    detect_max_age_hours: int = 24
     # Strength margin required before an established signal is demoted, which
     # stops a single noisy window from flipping it back and forth.
     detect_hysteresis: float = 8.0
@@ -108,6 +133,7 @@ class Settings(BaseSettings):
     vapid_private_key: str = ""
     vapid_subject: str = "mailto:admin@example.com"
     telegram_bot_token: str | None = None
+    telegram_token_encryption_key: str | None = None
 
     # --- retention ---
     # A signal is only interesting while it is fresh. Anything a user saved is

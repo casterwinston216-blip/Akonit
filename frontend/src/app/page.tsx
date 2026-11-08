@@ -5,9 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { FilterSelect } from "@/components/FilterSelect";
 import { IntroHero } from "@/components/IntroHero";
-import { TerminalLogStream } from "@/components/TerminalLogStream";
 import { AnalyticsMiniBanner } from "@/components/AnalyticsMiniBanner";
-import { SignalCard, SignalCardSkeleton } from "@/components/SignalCard";
+import { SignalCard } from "@/components/SignalCard";
 import { SkeletonList } from "@/components/SkeletonList";
 import { api, type FeedQuery } from "@/lib/api";
 import { countryName, sourceName } from "@/lib/format";
@@ -112,13 +111,27 @@ export default function FeedPage() {
   }, [load]);
 
   useEffect(() => {
-    void (async () => {
+    let active = true;
+    const refreshStats = async () => {
+      if (document.visibilityState === "hidden") return;
       try {
-        setStats(await api.stats());
+        const next = await api.stats();
+        if (active) setStats(next);
       } catch {
-        /* hero stats are optional */
+        // Keep the latest good counts during brief API/network interruptions.
       }
-    })();
+    };
+    void refreshStats();
+    const timer = setInterval(() => void refreshStats(), 30_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refreshStats();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   useEffect(() => {
@@ -178,7 +191,6 @@ export default function FeedPage() {
       <IntroHero stats={stats} firstRun={radars.length === 0} />
 
       <div id="feed">
-        <TerminalLogStream />
         <AnalyticsMiniBanner />
 
         <div className="section-title">
@@ -339,7 +351,7 @@ export default function FeedPage() {
                 ? "Try a different keyword, or clear the search to browse all signals."
                 : hasFilters
                   ? "Try removing a filter, or widen the country and tag selection."
-                  : "The collector runs every minute. It needs a moment to fetch the first cycle."}
+                  : "The scheduler checks every 15 seconds. Sources follow their own cadence, so the first full cycle may take a few seconds."}
             </p>
             {hasFilters ? (
               <button

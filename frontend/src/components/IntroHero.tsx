@@ -22,8 +22,8 @@ const STEPS = [
     text: "Countries, sources, tags, growth and strength thresholds. No code, no SQL.",
   },
   {
-    title: "The collector runs every minute",
-    text: "Free public sources, measured twice so growth is real rather than guessed.",
+    title: "The collector checks continuously",
+    text: "The scheduler checks every 15 seconds; each source keeps its own cadence and platform limits.",
   },
   {
     title: "Signals surface early",
@@ -109,7 +109,7 @@ export function IntroHero({ stats, firstRun }: Props) {
 
       <div className="hero-kicker">
         <span className="live-dot" style={{ background: "var(--brand)" }} />
-        Runs on your machine · collects every 60s
+        Runs on your machine · source-specific collection cadence
       </div>
 
       <h1 className="hero-title">
@@ -118,8 +118,8 @@ export function IntroHero({ stats, firstRun }: Props) {
       </h1>
 
       <p className="hero-sub">
-        Signal Radar measures TikTok, YouTube, X, Reddit, Google Trends and more
-        every minute, and shows only what just started growing fast. Tell it what
+        Signal Radar checks public sources on their own schedules and surfaces
+        activity that starts growing fast. Tell it what
         to watch with a <strong>radar</strong> — it does the rest.
       </p>
 

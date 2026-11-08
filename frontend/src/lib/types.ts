@@ -159,9 +159,9 @@ export interface CustomTagDraft {
 
 export interface RadarCondition {
   id?: string;
-  type: string;
+  type: ConditionType;
   operator: string;
-  value: any;
+  value: string | number | string[];
   unit?: string | null;
 }
 
@@ -209,12 +209,15 @@ export interface Profile {
   timezone: string;
   language: string;
   telegram_chat_id: string | null;
+  telegram_alerts_enabled: boolean;
   default_frequency: NotificationFrequency;
   onboarded: boolean;
   signal_threshold: number;
   default_countries: string[];
   default_sources: string[];
   default_tags: string[];
+  collector_source_weights: Record<string, number>;
+  collector_keywords: string[];
   quiet_hours: Record<string, unknown> | null;
   theme: string;
 }
@@ -256,4 +259,5 @@ export interface NotificationStatus {
   bot_configured?: boolean;
   linked?: boolean;
   chat_id?: string | null;
+  alerts_enabled?: boolean;
 }

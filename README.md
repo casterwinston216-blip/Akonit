@@ -6,7 +6,7 @@ Condition-driven monitoring of the open internet. You define conditions, the
 system collects from many free public sources, detects **early signals** (not
 news), and notifies you on your phone.
 
-**Zero API cost. No LLM. No scraping services. No proxies. No login walls.**
+**Free public sources by default. Background signal triage uses a lightweight local scorer and never blocks collection. Laya is optional because it adds a local ML runtime and downloads a model on first use. Signal briefings are generated only when requested and show their evidence gaps. Optional official APIs can improve coverage; paid reads are capped and off until you add your own credentials.**
 
 ---
 
@@ -29,6 +29,22 @@ You need one of these two setups:
 
 Nothing else. No account, no API key, no signup, no cloud service.
 
+### Optional Laya classifier
+
+The default install stays light and uses a deterministic fallback for AI triage.
+To enable the local Laya classifier on a computer with enough free memory, run
+from `backend/`:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements-laya.txt
+```
+
+Laya downloads its multilingual checkpoint from Hugging Face on the first
+eligible signal. The application limits inference to one worker and keeps one
+checkpoint resident. Skip this extra on low-memory machines; the collector and
+signal scoring work without it. See the [Laya package instructions](https://pypi.org/project/laya/)
+for model and hardware details.
+
 Not sure what you have? Run **`doctor.bat`** — it lists exactly what is missing
 and whether the app is already running.
 
@@ -44,7 +60,7 @@ To stop it: **`stop.bat`**, or close the windows `start.bat` opened.
 
 ### What you should see
 
-The worker checks for due sources every 60 seconds and runs one initial collection
+The worker checks for due sources every 15 seconds and runs one initial collection
 on startup. Each source has its own collection interval and may be unavailable
 or rate limited, so the first signal can take longer than a minute. Source health
 in the dashboard shows which collectors are currently returning data.
@@ -103,8 +119,45 @@ dashboard with `npm ci` and `npm run dev` from `frontend/`.
 
 The default installation needs no keys or accounts. Optional source credentials
 and push settings belong in your local `backend/.env`; never commit that file.
+For official X post search, add your X API Bearer Token there. X post reads are
+pay-per-use; Signal Radar requests at most 10 posts per search and caps reads at
+100/day by default. It polls that paid endpoint every three hours to preserve
+day-long coverage; the separate public trend feed remains more frequent. At the
+currently listed $0.005 per returned post, the hard cap is about $0.50/day;
+verify current rates and prepaid credits in X's
+Developer Console before enabling it. Set `X_POSTS_DAILY_READ_LIMIT=0` to keep
+official X post search disabled. X trends from the public trend feed remain
+available without a token.
+
+Official Reddit OAuth also uses credentials from your own approved Reddit app
+(`REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`). The collector rotates through
+communities and falls back to public RSS/archive sources when OAuth is not
+configured. External app access requires Reddit approval and compliance with its
+Data API terms; register your app under Reddit's current developer process. Set
+`REDDIT_USER_AGENT` to the app name and your actual Reddit username/contact.
+TikTok's broad Research API access is restricted to eligible, approved
+researchers. Public tag pages may challenge automated requests, so this app does
+not retry them or bypass the challenge. Without approved Creative Center access,
+the TikTok trends collector stays in an optional-credentials state. The app
+cannot see all TikTok posts or private data.
+Approved applicants can also apply for TikTok's Commercial Content API; its
+creator-country filter currently covers EEA countries, excluding the UK and
+Switzerland. Add the approved
+`TIKTOK_COMMERCIAL_CLIENT_KEY` and `TIKTOK_COMMERCIAL_CLIENT_SECRET` to enable
+this separate branded-content signal source.
 The root `.env` is only for Docker Compose. Local database files, logs, caches,
 and generated signal digests are ignored by Git and remain on your computer.
+
+### Add more public sources
+
+Put comma-separated RSS or Atom URLs in `EXTRA_RSS_FEEDS` in your local
+`backend/.env`. The collector accepts up to ten HTTP(S) feeds and bounds each
+response to 2 MB. If a site has no feed, you can run RSS-Bridge yourself and add
+its feed URL; public shared bridge instances may disappear or rate-limit you.
+Bluesky is sampled from its public Jetstream WebSocket in short bounded windows.
+Mastodon instances are configurable through `MASTODON_INSTANCES` (up to six);
+public timelines and search depend on each server's configuration and do not
+amount to global federation search.
 
 The default ports are bound to `127.0.0.1`. Authentication is disabled for a
 single-user local installation; do not expose the app directly to the internet.
@@ -118,7 +171,9 @@ Signal Radar is distributed under the [MIT License](LICENSE).
 `AUTH_DISABLED` defaults to `true`, so the API creates one local account on the
 first request and uses it for everything. Radars, saved signals and
 notifications work immediately, with no token, cookie or OAuth anywhere in the
-flow. Set `AUTH_DISABLED=false` only if you put this behind a shared host.
+flow. The API is intended for local use only. Shared-host authentication and
+account provisioning are not implemented; setting `AUTH_DISABLED=false` makes
+startup fail rather than exposing a misleading half-authenticated mode.
 
 ### The engine searches what you asked for
 
@@ -174,10 +229,25 @@ the pipeline.
 ## Sources
 
 Priority is social and viral content first, then trend/search, then AI/tech.
-Every adapter below was verified against the live site.
+The collector registry covers many public feeds and APIs. A registered adapter
+does not mean the platform grants complete access: check per-source health,
+credentials, rate limits, and each platform's current access terms.
 
 | # | Source | Strategy | Credentials | Status |
 |---|--------|----------|--------------|--------|
+| 1 | **TikTok** | public tag pages; approved Commercial Content API adds disclosed branded content | optional approval | limited public data |
+| 2 | **Bluesky Live** | short samples from public Jetstream WebSocket | none | live posts; bounded windows |
+| 3 | **Bluesky Search** | public AppView search | none | query-dependent |
+| 4 | **Mastodon** | public trends/statuses from up to 6 configured instances | none | instance-dependent |
+| 5 | **Reddit** | approved OAuth → public archive/RSS fallbacks | optional approved app | limited by instance/rate limits |
+| 6 | **X Trends** | public trend cards | none | third-party aggregate |
+| 7 | **X Posts** | official recent-post search, every 3h | Bearer token + credits | capped at 100 returned posts/day |
+| 8 | **Custom RSS / Atom** | user-configured feeds; up to 10 | none | depends on supplied feeds |
+| 9 | **YouTube** | channel RSS/public pages; Data API when configured | optional API key | route-dependent |
+| 10 | **Google Trends / News** | public trend feeds/search | none | public datasets |
+| 11 | **GitHub / Hugging Face** | public API/search and trending | optional tokens | public project signals |
+| 12 | **Product Hunt / HN / npm / DEV / Lobsters / Stack Overflow** | public APIs and RSS | mostly none | source-specific limits |
+| 13 | **Other registered adapters** | arXiv, SEC, patents, trademarks, Polymarket, etc. | source-specific | see source health |
 ### Why Instagram is marked honestly
 
 Public hashtag pages load their data through an **authenticated internal
@@ -193,8 +263,8 @@ We never bypass CAPTCHA, logins, paywalls, rate limits or anti-bot systems.
 ### Credential cascade
 
 Adapters declare an ordered list of strategies. The runner tries each until one
-produces data. Tokens are **optional** — if one is present in `.env` the better
-strategy is used automatically, otherwise the free one runs.
+produces data. Optional credentials activate the official API path where one is
+available; they do not bypass platform approval or usage limits.
 
 ---
 
@@ -284,10 +354,10 @@ starts for you. It schedules four jobs:
 
 | Job | Default interval | What it does |
 |-----|------------------|--------------|
-| `collect` | `COLLECT_INTERVAL_SECONDS` (900) | fetch → normalize → dedup → detect |
+| `collect` | `COLLECT_INTERVAL_SECONDS` (60) | fetch → normalize → dedup → detect |
 | `match` | 5 min | evaluate signals against every radar |
 | `notify` | 1 min | queue and deliver due notifications |
-| `metrics` | `SNAPSHOT_INTERVAL_SECONDS` (900) | recompute growth/strength from snapshots |
+| `metrics` | `SNAPSHOT_INTERVAL_SECONDS` (300) | recompute growth/strength from snapshots |
 
 Graceful shutdown on SIGTERM/SIGINT, `max_instances=1` so a slow tick is never
 overlapped, and `coalesce=True` so missed ticks do not pile up.
@@ -325,27 +395,10 @@ alembic revision --autogenerate -m "describe change"
 
 ## Continuous integration
 
-Two workflows run from this repository.
-
-| Workflow | Trigger | What it does |
-|----------|---------|--------------|
-| `test.yml` | push, pull request | backend tests against Postgres, `alembic check`, `tsc`, `next build` |
-| `collect.yml` | cron every 20 min | migrations, seed, one collect cycle, radar matching, notifications |
-
-To let `collect.yml` run, add these repository secrets under
-**Settings → Secrets and variables → Actions**:
-
-| Secret | Required | Purpose |
-|--------|----------|---------|
-| `DATABASE_URL` | yes | `postgresql+asyncpg://USER:PASSWORD@HOST:5432/DB` |
-| `SECRET_KEY` | yes | JWT signing |
-| `GITHUB_TOKEN` | no | raises the GitHub limit 60 → 5000 req/h |
-| `HF_TOKEN` | no | private Hub models |
-| `TELEGRAM_BOT_TOKEN` | no | Telegram notifications |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | no | web push |
-
-`collect.yml` can also be triggered by hand (**Run workflow**) with a
-`full` toggle for collect-only runs.
+The `test.yml` workflow runs on pushes, pull requests, and manual dispatch. It
+checks the backend schema and tests, then type-checks and builds the frontend.
+It uses its own temporary PostgreSQL service and does not require repository
+secrets.
 
 ### Using Supabase as the database
 
@@ -443,7 +496,8 @@ All optional. With an empty `.env` the system already runs on free public data.
 | `YOUTUBE_API_KEY` | unlocks Data API v3 (quota-aware) |
 | `TIKTOK_API_TOKEN` | unlocks official Creative Center API |
 | `INSTAGRAM_ACCESS_TOKEN` + `META_APP_ID` | unlocks Instagram |
-| `TELEGRAM_BOT_TOKEN` | enables Telegram notifications |
+| `TELEGRAM_BOT_TOKEN` | optional shared Telegram bot; each local user can also connect a private bot in Settings |
+| `TELEGRAM_TOKEN_ENCRYPTION_KEY` | encrypts personal bot tokens stored in the database; keep it private and persistent |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | enables web push |
 | `REDIS_URL` | pub/sub; falls back to an in-memory bus |
 
@@ -466,9 +520,9 @@ backend/
     workers/       24/7 scheduler + tasks
     api/v1/        auth, taxonomy, radars, signals, stream, system
   tools/           verification scripts
-  tests/           27 unit tests
+  tests/           backend unit and integration tests
 frontend/
-  src/app/         feed, login, radars, saved, profile, settings, signal detail
+  src/app/         feed, login explainer, radars, saved, profile, settings, signal detail
   src/components/  SignalCard, ConditionBuilder, AppShell
   src/lib/         api client, SSE hook, formatters
 ```
@@ -477,9 +531,12 @@ frontend/
 
 ## Non-goals (by design)
 
-- No LLM / no AI API anywhere — detection is deterministic.
+- No external LLM or AI API is used. The default background triage is deterministic
+  and low-resource. Laya requires a separate install; its absence does not affect
+  collection. Signal briefings are transparent templates, not generated predictions.
 - No maps or geographic visualisation — countries are badges only.
-- No paid APIs, scraping services, proxies or trend aggregators.
+- No scraping-service dependency or proxy requirement. Optional official APIs
+  may cost money; the X reads budget is capped locally.
 - Signals are never deleted after a decline; history is always kept.
 cd frontend
 npm install
@@ -497,10 +554,11 @@ python -m tools.check_radar        # condition engine truth table
 python -m tools.live_check         # end-to-end against running servers
 python -m pytest tests -q          # 27 unit tests
 ```
-| 1 | **TikTok** | public tag pages (`__UNIVERSAL_DATA_FOR_REHYDRATION__`) → official Creative Center API | optional | ACTIVE |
-| 2 | **YouTube** | search results (`ytInitialData`, incl. Shorts) → channel RSS → Data API v3 | optional | ACTIVE |
-| 3 | **Reddit** | PullPush archive → search RSS → official OAuth | optional | ACTIVE |
-| 4 | **X / Twitter** | trends24 public trend cards (1h/6h/24h windows) → official API | optional | ACTIVE |
+| 1 | **TikTok** | public tag pages; approved Commercial Content API adds European branded content | approved client key/secret | limited public data |
+| 2 | **YouTube** | channel RSS / public page data; Data API v3 when configured | optional API key | depends on configured route |
+| 3 | **Reddit** | approved OAuth → public archive and RSS fallback | optional approved app | fallback works without OAuth |
+| 4 | **X Trends** | public trend cards | none | external trend feed |
+| 5 | **X Posts** | official recent-post search using radar keywords | Bearer Token + prepaid credits | disabled until token; max 100 reads/day |
 | 5 | **Google Trends** | Trending Now RSS per country (`approx_traffic`) | none | ACTIVE |
 | 6 | **Google News Trends** | `when:1h/6h/24h` recency operator | none | ACTIVE |
 | 7 | **GitHub** | search/repositories (new + fast star growth) | optional token | ACTIVE |

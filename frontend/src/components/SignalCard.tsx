@@ -61,10 +61,19 @@ export function SignalCard({ signal, onChange, onDelete }: Props) {
   const meta = STATUS_META[signal.status] ?? STATUS_META.NEW;
   const StatusIcon = STATUS_ICON[meta.icon as StatusIconName];
   const tone = strengthTone(signal.strength);
-  const growthTone = signal.growth > 0 ? "up" : "down";
   const hasGrowth = signal.growth > 0;
+  const hasMeasuredActivity =
+    signal.current_activity > 0 || signal.previous_activity > 0 || hasGrowth;
+  const evidenceLabel = signal.cross_source_count > 1
+    ? `${signal.cross_source_count} source groups`
+    : hasMeasuredActivity
+      ? "Activity observed"
+      : "Single mention";
 
-  const isCritical = signal.ai_priority === "critical";
+  const isCritical =
+    signal.ai_priority === "critical" &&
+    signal.strength >= 45 &&
+    (signal.status === "RISING" || signal.status === "BREAKOUT");
   const isNoise = signal.ai_priority === "noise";
 
   async function toggleSave() {
@@ -148,21 +157,21 @@ export function SignalCard({ signal, onChange, onDelete }: Props) {
           </span>
         )}
 
-        {signal.ai_priority === "critical" && (
-          <span className="ai-badge ai-badge--critical" title={`AI Confidence: ${Math.round((signal.ai_priority_score || 0) * 100)}%`}>
-            ⚡ Critical ({Math.round((signal.ai_priority_score || 0) * 100)}%)
+        {isCritical && (
+          <span className="ai-badge ai-badge--critical" title={`Classifier ranking score, not a probability: ${Math.round((signal.ai_priority_score || 0) * 100)}`}>
+            ⚡ Critical · {Math.round((signal.ai_priority_score || 0) * 100)}
           </span>
         )}
 
         {signal.ai_priority === "watch" && (
-          <span className="ai-badge ai-badge--watch" title={`AI Confidence: ${Math.round((signal.ai_priority_score || 0) * 100)}%`}>
-            👁 Watch ({Math.round((signal.ai_priority_score || 0) * 100)}%)
+          <span className="ai-badge ai-badge--watch" title={`Classifier ranking score, not a probability: ${Math.round((signal.ai_priority_score || 0) * 100)}`}>
+            👁 Watch · {Math.round((signal.ai_priority_score || 0) * 100)}
           </span>
         )}
 
         {signal.ai_priority === "noise" && (
-          <span className="ai-badge ai-badge--noise" title={`Noise Probability: ${Math.round((signal.ai_noise_probability || 0) * 100)}%`}>
-            Noise ({Math.round((signal.ai_noise_probability || 0) * 100)}%)
+          <span className="ai-badge ai-badge--noise" title={`Uncalibrated noise score: ${Math.round((signal.ai_noise_probability || 0) * 100)}`}>
+            Noise · {Math.round((signal.ai_noise_probability || 0) * 100)}
           </span>
         )}
 
@@ -202,17 +211,19 @@ export function SignalCard({ signal, onChange, onDelete }: Props) {
         </div>
       )}
 
-      {signal.cross_source_count > 1 && (
-        <div className="card-tags card-evidence">
+      <div className="card-tags card-evidence">
           <span
             className="tag-chip"
-            title="Detected on multiple sources; this alone does not prove independent confirmation."
+            title={signal.cross_source_count > 1
+              ? "The story appeared in multiple source families. This is evidence of broader coverage, not proof of truth."
+              : hasMeasuredActivity
+                ? "This source reports measurable activity or growth."
+                : "A fresh item found once, with no measurable activity or independent corroboration yet."}
           >
-            <LayersIcon size={12} />
-            {signal.cross_source_count} sources
+            {signal.cross_source_count > 1 && <LayersIcon size={12} />}
+            {evidenceLabel}
           </span>
-        </div>
-      )}
+      </div>
 
       <div className="card-foot">
         <span className="dim text-xs mono">

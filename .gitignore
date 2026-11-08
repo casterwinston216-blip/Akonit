@@ -5,6 +5,11 @@ __pycache__/
 .venv/
 venv/
 
+# Optional local inference downloads and installers (large, machine-specific).
+models/
+*.gguf
+OllamaSetup.exe
+
 # Databases
 *.db
 *.sqlite3
@@ -22,12 +27,14 @@ venv/
 
 # Tooling caches
 .pytest_cache/
+.pytest_tmp/
 .ruff_cache/
 .mypy_cache/
 
 # Node
 node_modules/
 .next/
+.next-build/
 out/
 npm-debug.log*
 *.tsbuildinfo
@@ -38,6 +45,17 @@ npm-debug.log*
 *.log
 *.err
 *.out
+backend/api_report.txt
+backend/exp.txt
+backend/live_report.txt
+backend/run[2-5].txt
+backend/sb.txt
+backend/short.txt
+backend/syntax_report.txt
+backend/testout.txt
+frontend/buildclean.txt
+frontend/playwright-report/
+frontend/test-results/
 backend/reports/
 frontend/scripts/
 
